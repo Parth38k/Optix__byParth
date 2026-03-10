@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>OPTIX — Options Trading Platform</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+--bg:#06080f;--surface:#0c1018;--surfaceUp:#111827;
+--border:#1c2333;--borderGold:rgba(180,145,60,0.35);
+--gold:#c9a84c;--goldLight:#e2c97e;--goldDim:rgba(201,168,76,0.12);--goldDimB:rgba(201,168,76,0.25);
+--text:#e8eaf0;--textMid:#8a95a8;--textDim:#3d4a5c;
+--green:#34d399;--red:#f87171;--orange:#fb923c;--blue:#60a5fa;
+--mono:'IBM Plex Mono',monospace;--display:'Playfair Display',serif;
+--goldGrad:linear-gradient(135deg,#c9a84c,#e2c97e,#b8960a);
+}
+html{background:var(--bg);color:var(--text);font-family:var(--mono);font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased}
+body{min-height:100vh;overflow-x:hidden}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:var(--surface)}
+::-webkit-scrollbar-thumb{background:var(--borderGold);border-radius:3px}
+button{font-family:var(--mono);cursor:pointer;border:none;outline:none}
+input,select{font-family:var(--mono);outline:none}
+
+@keyframes fadeIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes tickerScroll{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+@keyframes glowPulse{0%,100%{box-shadow:0 0 8px rgba(201,168,76,0.2)}50%{box-shadow:0 0 20px rgba(201,168,76,0.4)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes barGrow{from{height:0}to{height:var(--h)}}
+
+.fade-in{animation:fadeIn .5s ease both}
+.fade-d1{animation:fadeIn .5s ease .1s both}
+.fade-d2{animation:fadeIn .5s ease .2s both}
+.fade-d3{animation:fadeIn .5s ease .3s both}
+
+#topbar{position:sticky;top:0;z-index:100;background:rgba(6,8,15,0.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:52px}
+#topbar .logo{font-family:var(--display);font-size:22px;font-weight:800;background:var(--goldGrad);-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:2px}
+#topbar .logo span{font-family:var(--mono);font-size:10px;font-weight:400;-webkit-text-fill-color:var(--textMid);margin-left:8px;letter-spacing:0}
+#topbar .nav{display:flex;gap:4px}
+#topbar .nav button{padding:6px 14px;border-radius:4px;font-size:11px;font-weight:500;background:transparent;color:var(--textMid);transition:all .2s;letter-spacing:.5px;text-transform:uppercase}
+#topbar .nav button:hover{color:var(--gold);background:var(--goldDim)}
+#topbar .nav button.active{color:var(--gold);background:var(--goldDimB);border:1px solid var(--borderGold)}
+#topbar .nav button.has-count::after{content:attr(data-count);margin-left:5px;font-size:9px;background:var(--gold);color:var(--bg);padding:1px 5px;border-radius:8px;font-weight:700}
+#topbar .risk-badge{font-size:10px;padding:4px 10px;border-radius:3px;font-weight:600;letter-spacing:.5px;border:1px solid var(--borderGold);color:var(--gold);background:var(--goldDim)}
+
+#app{max-width:1440px;margin:0 auto;padding:16px 24px 60px}
+
+.risk-screen{display:flex;flex-direction:column;align-items:center;padding-top:60px}
+.risk-screen h1{font-family:var(--display);font-size:42px;font-weight:800;background:var(--goldGrad);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px}
+.risk-screen .tagline{font-size:11px;color:var(--gold);letter-spacing:3px;text-transform:uppercase;margin-bottom:8px}
+.risk-screen .sub{color:var(--textMid);font-size:12px;margin-bottom:48px;text-align:center;max-width:440px}
+.risk-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:24px 28px;width:100%;max-width:500px;margin-bottom:20px}
+.risk-card label{display:block;color:var(--gold);font-size:10px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:12px}
+.risk-card .opts{display:flex;flex-direction:column;gap:6px}
+.risk-card .opt{padding:10px 14px;border-radius:5px;font-size:12px;background:var(--surfaceUp);border:1px solid var(--border);color:var(--textMid);cursor:pointer;transition:all .2s;text-align:left}
+.risk-card .opt:hover{border-color:var(--borderGold);color:var(--text)}
+.risk-card .opt.sel{border-color:var(--gold);color:var(--gold);background:var(--goldDim)}
+.risk-submit{margin-top:16px;padding:12px 44px;border-radius:5px;font-size:12px;font-weight:600;background:var(--goldGrad);color:#06080f;letter-spacing:1px;text-transform:uppercase;transition:all .2s;opacity:.4;pointer-events:none}
+.risk-submit.rdy{opacity:1;pointer-events:all}
+.risk-submit.rdy:hover{transform:translateY(-1px);box-shadow:0 4px 20px rgba(201,168,76,0.3)}
+
+.ticker-wrap{overflow:hidden;border-bottom:1px solid var(--border);background:var(--surface);margin:-16px -24px 20px}
+.ticker-tape{display:flex;white-space:nowrap;animation:tickerScroll 200s linear infinite;will-change:transform}
+.ticker-wrap:hover .ticker-tape{animation-play-state:paused}
+.ti{display:inline-flex;align-items:center;gap:8px;padding:8px 16px;font-size:11px;color:var(--textMid);border-right:1px solid var(--border);flex-shrink:0;cursor:pointer;transition:all .15s}
+.ti:hover{background:var(--surfaceUp);color:var(--text)}
+.ti .sym{color:var(--gold);font-weight:600}
+.ti .up{color:var(--green)}.ti .dn{color:var(--red)}
+
+.dash-tabs{display:flex;gap:4px;margin-bottom:0}
+.dash-tabs button{padding:8px 18px;border-radius:4px;font-size:11px;font-weight:500;background:transparent;color:var(--textMid);transition:all .2s;letter-spacing:.5px;text-transform:uppercase;border:1px solid transparent}
+.dash-tabs button:hover{color:var(--gold)}
+.dash-tabs button.active{color:var(--gold);background:var(--goldDim);border-color:var(--borderGold)}
+
+.filter-bar{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
+.filter-bar input{flex:1;min-width:200px;padding:8px 12px;border-radius:4px;font-size:12px;background:var(--surfaceUp);border:1px solid var(--border);color:var(--text)}
+.filter-bar input:focus{border-color:var(--gold)}
+.filter-bar select{padding:8px 12px;border-radius:4px;font-size:11px;background:var(--surfaceUp);border:1px solid var(--border);color:var(--textMid);min-width:120px;cursor:pointer}
+
+.strat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:12px}
+.sc{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:16px 18px;cursor:pointer;transition:all .25s;position:relative;overflow:hidden}
+.sc:hover{border-color:var(--borderGold);transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,0.3)}
+.sc .nm{font-size:13px;font-weight:600;color:var(--text);margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.sc .rec{font-size:9px;color:var(--gold);background:var(--goldDim);padding:2px 6px;border-radius:3px;font-weight:700}
+.sc .tags{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px}
+.tag{font-size:9px;padding:2px 7px;border-radius:3px;font-weight:500}
+.tag.rc{color:var(--green);background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.2)}
+.tag.rm{color:var(--orange);background:rgba(251,146,60,0.1);border:1px solid rgba(251,146,60,0.2)}
+.tag.ra{color:var(--red);background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.2)}
+.tag.vw{color:var(--blue);background:rgba(96,165,250,0.1);border:1px solid rgba(96,165,250,0.15)}
+.sc .desc{font-size:11px;color:var(--textMid);line-height:1.5}
+.sc .ii{position:absolute;top:12px;right:12px;width:18px;height:18px;border-radius:50%;border:1px solid var(--borderGold);color:var(--gold);font-size:10px;display:flex;align-items:center;justify-content:center;cursor:help}
+.sc .tip{display:none;position:absolute;top:34px;right:8px;z-index:10;background:var(--surfaceUp);border:1px solid var(--borderGold);border-radius:5px;padding:10px 12px;font-size:11px;color:var(--textMid);width:240px;line-height:1.5;white-space:normal;box-shadow:0 8px 24px rgba(0,0,0,0.5)}
+.sc .ii:hover+.tip{display:block}
+
+.bh{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid var(--border)}
+.bh h2{font-family:var(--display);font-size:22px;font-weight:700;background:var(--goldGrad);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.bh .meta{font-size:11px;color:var(--textMid)}
+.bh .tb{color:var(--gold);font-weight:600;margin-left:6px}
+.bt{display:flex;gap:2px;margin-bottom:20px;background:var(--surface);border-radius:6px;padding:3px;border:1px solid var(--border)}
+.bt button{flex:1;padding:8px 6px;border-radius:4px;font-size:10px;font-weight:500;background:transparent;color:var(--textMid);transition:all .2s;letter-spacing:.3px;text-transform:uppercase}
+.bt button:hover{color:var(--text)}
+.bt button.active{color:var(--gold);background:var(--goldDimB)}
+.bt .num{display:inline-block;width:16px;height:16px;line-height:16px;text-align:center;border-radius:50%;font-size:9px;margin-right:4px;background:var(--surfaceUp);border:1px solid var(--border)}
+.bt button.active .num{background:var(--goldDim);border-color:var(--gold);color:var(--gold)}
+
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:20px 24px}
+.panel h3{font-size:13px;font-weight:600;color:var(--gold);margin-bottom:16px;letter-spacing:.5px;text-transform:uppercase}
+
+.lt{width:100%;border-collapse:collapse;font-size:11px}
+.lt th{text-align:left;padding:8px 8px;color:var(--textDim);font-weight:500;font-size:10px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border)}
+.lt td{padding:7px 8px;border-bottom:1px solid rgba(28,35,51,0.5);color:var(--text)}
+.lt select,.lt input{background:var(--surfaceUp);border:1px solid var(--border);border-radius:3px;color:var(--text);padding:5px 6px;font-size:11px;width:100%}
+.lt input:focus,.lt select:focus{border-color:var(--gold)}
+.prem{color:var(--gold);font-weight:600}
+.grk{font-size:10px;color:var(--textMid)}
+.add-leg{margin-top:12px;padding:6px 14px;font-size:11px;background:var(--surfaceUp);border:1px solid var(--border);border-radius:4px;color:var(--textMid);transition:all .2s}
+.add-leg:hover{border-color:var(--gold);color:var(--gold)}
+.rm-leg{background:none;border:none;color:var(--red);font-size:14px;cursor:pointer;opacity:.5;padding:2px 6px}
+.rm-leg:hover{opacity:1}
+
+.payoff-svg{width:100%;height:340px;background:var(--surfaceUp);border-radius:6px;border:1px solid var(--border)}
+
+.gg{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+.gb{text-align:center}
+.gb .gl{font-size:10px;color:var(--textMid);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px}
+.gb .bw{height:120px;background:var(--surfaceUp);border-radius:4px;position:relative;overflow:hidden;border:1px solid var(--border)}
+.gb .bf{position:absolute;bottom:0;left:0;right:0;border-radius:0 0 4px 4px;transition:height .5s ease}
+.gb .gv{font-size:12px;font-weight:600;margin-top:6px}
+.gb .gh{font-size:9px;color:var(--textDim);margin-top:2px;line-height:1.4;min-height:28px}
+
+.st{width:100%;border-collapse:collapse;font-size:11px;text-align:center}
+.st th{padding:8px;color:var(--textDim);font-size:10px;text-transform:uppercase;letter-spacing:.3px;border-bottom:1px solid var(--border)}
+.st td{padding:8px;border-bottom:1px solid rgba(28,35,51,0.4)}
+.st .hc{color:var(--gold);font-weight:600;text-align:left}
+.profit{color:var(--green)}.loss{color:var(--red)}.neutral{color:var(--textMid)}
+
+.rsec{margin-bottom:20px}
+.rsec h4{font-size:11px;color:var(--gold);font-weight:600;letter-spacing:.5px;text-transform:uppercase;margin-bottom:10px}
+.rrow{display:flex;justify-content:space-between;padding:6px 0;font-size:12px;border-bottom:1px solid rgba(28,35,51,0.3)}
+.rrow .rl{color:var(--textMid)}.rrow .rv{color:var(--text);font-weight:500}
+.rwarn{background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.2);border-radius:5px;padding:12px 16px;margin-bottom:16px;font-size:11px;color:var(--red);line-height:1.6}
+.rwarn .wt{font-weight:700;margin-bottom:4px;font-size:12px}
+.ack-row{display:flex;align-items:center;gap:8px;margin:16px 0;font-size:11px;color:var(--textMid)}
+.ack-row input{accent-color:var(--gold)}
+.cbtn{padding:12px 32px;border-radius:5px;font-size:12px;font-weight:600;background:var(--goldGrad);color:#06080f;letter-spacing:.5px;text-transform:uppercase;transition:all .2s;opacity:.4;pointer-events:none}
+.cbtn.rdy{opacity:1;pointer-events:all}
+.cbtn.rdy:hover{transform:translateY(-1px);box-shadow:0 4px 20px rgba(201,168,76,0.3)}
+
+.tl-empty{text-align:center;padding:40px 0;color:var(--textDim);font-size:12px}
+.tl-card{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:14px 18px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;transition:border-color .2s}
+.tl-card:hover{border-color:var(--borderGold)}
+.tl-card.new{animation:glowPulse 1.5s ease 2}
+
+.it{width:100%;border-collapse:collapse;font-size:11px}
+.it th{text-align:left;padding:10px 12px;color:var(--textDim);font-size:10px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface)}
+.it td{padding:10px 12px;border-bottom:1px solid rgba(28,35,51,0.4);vertical-align:top}
+.it .isc{color:var(--gold);font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.5px}
+.ibadge{display:inline-block;padding:1px 6px;border-radius:3px;font-size:9px;font-weight:600;color:var(--gold);background:var(--goldDim);border:1px solid var(--borderGold)}
+
+.spinner{width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:spin .8s linear infinite;display:inline-block;vertical-align:middle;margin-right:8px}
+
+.modal-ov{position:fixed;inset:0;z-index:200;background:rgba(6,8,15,0.85);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;animation:fadeIn .3s ease}
+.modal-box{background:var(--surface);border:1px solid var(--borderGold);border-radius:8px;padding:32px;max-width:420px;width:90%;text-align:center;animation:glowPulse 2s ease infinite}
+
+.ps{font-size:10px;padding:4px 10px;border-radius:3px;display:inline-flex;align-items:center;gap:6px}
+.ps.live{color:var(--green);background:rgba(52,211,153,0.08);border:1px solid rgba(52,211,153,0.2)}
+.ps.del{color:var(--orange);background:rgba(251,146,60,0.08);border:1px solid rgba(251,146,60,0.2)}
+.ps.sim{color:var(--textDim);background:rgba(61,74,92,0.15);border:1px solid rgba(61,74,92,0.3)}
+
+.intel-status{display:flex;align-items:center;gap:8px;padding:16px 0;font-size:11px;color:var(--textMid)}
+.intel-status .step{display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:4px;background:var(--surfaceUp);border:1px solid var(--border)}
+.intel-status .step.done{border-color:rgba(52,211,153,0.3);color:var(--green)}
+.intel-status .step.active{border-color:var(--borderGold);color:var(--gold)}
+
+@media(max-width:768px){
+  #app{padding:12px 12px 40px}
+  .strat-grid{grid-template-columns:1fr}
+  .gg{grid-template-columns:repeat(3,1fr)}
+  .bt button{font-size:9px;padding:6px 4px}
+  .filter-bar{flex-direction:column}
+}
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <div class="logo">OPTIX<span>byParth</span></div>
+  <div class="nav" id="nav"></div>
+  <div class="risk-badge" id="riskBadge" style="display:none"></div>
+</div>
+<div id="app"></div>
+<div class="modal-ov" id="modal" style="display:none">
+  <div class="modal-box">
+    <div style="font-size:48px;margin-bottom:16px">✦</div>
+    <h3 style="font-family:var(--display);font-size:20px;color:var(--gold);margin-bottom:8px">Paper Trade Confirmed</h3>
+    <p id="modalMsg" style="font-size:12px;color:var(--textMid);margin-bottom:20px"></p>
+    <button onclick="closeModal()" style="padding:10px 28px;border-radius:5px;font-size:11px;font-weight:600;background:var(--goldGrad);color:#06080f;letter-spacing:.5px;text-transform:uppercase">View Trade Log →</button>
+  </div>
+</div>
+
+<script>
+// ============================================================
+//  OPTIX — Full Platform v3
+// ============================================================
+
+const C={bg:'#06080f',surface:'#0c1018',surfaceUp:'#111827',border:'#1c2333',borderGold:'rgba(180,145,60,0.35)',gold:'#c9a84c',goldLight:'#e2c97e',goldDim:'rgba(201,168,76,0.12)',goldDimB:'rgba(201,168,76,0.25)',text:'#e8eaf0',textMid:'#8a95a8',textDim:'#3d4a5c',green:'#34d399',red:'#f87171',orange:'#fb923c',blue:'#60a5fa'};
+
+const INSTRUMENTS={
+Technology:'AAPL MSFT NVDA GOOGL META AMZN TSLA AVGO AMD INTC CRM ORCL ADBE QCOM NOW MU AMAT PLTR NET SNOW UBER ABNB SHOP ROKU ZM'.split(' '),
+Finance:'JPM BAC GS MS WFC BLK V MA AXP C SCHW HOOD SQ PYPL SOFI COF'.split(' '),
+Healthcare:'JNJ UNH LLY PFE MRK ABBV TMO AMGN GILD ISRG REGN'.split(' '),
+Energy:'XOM CVX COP SLB OXY'.split(' '),
+Consumer:'WMT COST HD MCD SBUX NKE TGT LOW'.split(' '),
+Industrials:'CAT DE BA GE RTX LMT UPS FDX F GM'.split(' '),
+Comms:'NFLX DIS CMCSA T SPOT'.split(' '),
+EV:'RIVN LCID'.split(' '),
+Crypto:'COIN MSTR MARA'.split(' '),
+'China ADR':'BABA JD PDD BIDU NIO'.split(' '),
+Meme:'GME AMC'.split(' '),
+'Index ETF':'SPY QQQ IWM DIA'.split(' '),
+'Sector ETF':'XLF XLK XLE XLV XLY ARKK'.split(' '),
+'Commodity ETF':'GLD SLV USO'.split(' '),
+'Bond ETF':'TLT HYG'.split(' '),
+'Leveraged ETF':'TQQQ SQQQ SOXL SOXS'.split(' '),
+};
+const ALL_TICKERS=Object.values(INSTRUMENTS).flat();
+
+const STRATEGIES=[
+{name:'Covered Call',risk:'Conservative',view:'Neutral/Bullish',legs:[{dir:'Long',type:'Stock'},{dir:'Short',type:'Call'}],desc:'Own shares, sell a call above. Collect premium, cap upside.',tip:'You own the stock and sell someone the right to buy it. You keep the premium but give up gains above the strike.'},
+{name:'Cash-Secured Put',risk:'Conservative',view:'Bullish',legs:[{dir:'Short',type:'Put'}],desc:'Sell a put backed by cash. Collect premium or buy shares at discount.',tip:'You agree to buy the stock at the strike price. If it stays above, you keep the premium.'},
+{name:'Protective Put',risk:'Conservative',view:'Bullish (hedged)',legs:[{dir:'Long',type:'Stock'},{dir:'Long',type:'Put'}],desc:'Own shares + buy a put as insurance against a drop.',tip:'Like buying insurance on your stock position — limits your downside.'},
+{name:'Collar',risk:'Conservative',view:'Neutral',legs:[{dir:'Long',type:'Stock'},{dir:'Long',type:'Put'},{dir:'Short',type:'Call'}],desc:'Own shares, buy a put floor, sell a call ceiling.',tip:'Wraps your stock in a defined range — limited loss and limited gain.'},
+{name:'Bull Call Spread',risk:'Moderate',view:'Bullish',legs:[{dir:'Long',type:'Call'},{dir:'Short',type:'Call'}],desc:'Buy lower call, sell higher call. Defined-risk bullish bet.',tip:'You profit if the stock rises, but your gain is capped at the upper strike.'},
+{name:'Bear Put Spread',risk:'Moderate',view:'Bearish',legs:[{dir:'Long',type:'Put'},{dir:'Short',type:'Put'}],desc:'Buy higher put, sell lower put. Defined-risk bearish bet.',tip:'You profit if the stock drops, but your gain is capped at the lower strike.'},
+{name:'Bull Put Spread',risk:'Moderate',view:'Bullish',legs:[{dir:'Short',type:'Put'},{dir:'Long',type:'Put'}],desc:'Sell higher put, buy lower put. Credit spread, bullish.',tip:'You collect premium upfront and profit if the stock stays above the short strike.'},
+{name:'Bear Call Spread',risk:'Moderate',view:'Bearish',legs:[{dir:'Short',type:'Call'},{dir:'Long',type:'Call'}],desc:'Sell lower call, buy higher call. Credit spread, bearish.',tip:'You collect premium and profit if the stock stays below the short strike.'},
+{name:'Iron Condor',risk:'Moderate',view:'Neutral',legs:[{dir:'Short',type:'Put'},{dir:'Long',type:'Put'},{dir:'Short',type:'Call'},{dir:'Long',type:'Call'}],desc:'Sell put spread + call spread. Profit from low volatility.',tip:'You bet the stock stays in a range. Max profit if it stays between your short strikes.'},
+{name:'Iron Butterfly',risk:'Moderate',view:'Neutral',legs:[{dir:'Short',type:'Put'},{dir:'Long',type:'Put'},{dir:'Short',type:'Call'},{dir:'Long',type:'Call'}],desc:'ATM straddle + OTM wings. Tight range, higher premium.',tip:'Like an iron condor but with short strikes at the same price — more premium, tighter range.'},
+{name:'Butterfly Spread',risk:'Moderate',view:'Neutral',legs:[{dir:'Long',type:'Call'},{dir:'Short',type:'Call'},{dir:'Short',type:'Call'},{dir:'Long',type:'Call'}],desc:'Buy 1 low, sell 2 mid, buy 1 high. Profit at exact price.',tip:'Max profit if the stock lands exactly at the middle strike at expiry.'},
+{name:'Calendar Spread',risk:'Moderate',view:'Neutral',legs:[{dir:'Short',type:'Call'},{dir:'Long',type:'Call'}],desc:'Sell near-term, buy far-term same strike. Time decay play.',tip:'You profit from the near-term option decaying faster than the far-term one.'},
+{name:'Diagonal Spread',risk:'Moderate',view:'Directional',legs:[{dir:'Long',type:'Call'},{dir:'Short',type:'Call'}],desc:'Different strikes and expirations. Flexible directional play.',tip:'Combines a calendar and vertical spread — direction + time decay.'},
+{name:'Long Straddle',risk:'Aggressive',view:'Volatile',legs:[{dir:'Long',type:'Call'},{dir:'Long',type:'Put'}],desc:'Buy ATM call + put. Profit from big move either way.',tip:"You need a big move to profit — direction doesn't matter, magnitude does."},
+{name:'Long Strangle',risk:'Aggressive',view:'Volatile',legs:[{dir:'Long',type:'Call'},{dir:'Long',type:'Put'}],desc:'Buy OTM call + put. Cheaper vol bet, needs bigger move.',tip:'Like a straddle but cheaper — you need an even bigger move to profit.'},
+{name:'Short Straddle',risk:'Aggressive',view:'Neutral (low vol)',legs:[{dir:'Short',type:'Call'},{dir:'Short',type:'Put'}],desc:'Sell ATM call + put. High premium, unlimited risk.',tip:'You collect maximum premium but face unlimited loss if the stock moves big.'},
+{name:'Short Strangle',risk:'Aggressive',view:'Neutral (low vol)',legs:[{dir:'Short',type:'Call'},{dir:'Short',type:'Put'}],desc:'Sell OTM call + put. Wider range, still unlimited risk.',tip:'Similar to short straddle but gives the stock more room to move.'},
+{name:'The Wheel',risk:'Moderate',view:'Bullish',legs:[{dir:'Short',type:'Put'}],desc:'Cycle: sell puts → get assigned → sell calls. Repeat.',tip:'A systematic income strategy — you keep selling options and collecting premium.'},
+{name:'Put Ratio Spread',risk:'Aggressive',view:'Bearish',legs:[{dir:'Long',type:'Put'},{dir:'Short',type:'Put'},{dir:'Short',type:'Put'}],desc:'Buy 1 put, sell 2 lower puts. Net credit, downside risk.',tip:'Profits moderately from a drop but loses big if the stock crashes through.'},
+{name:'Risk Reversal',risk:'Aggressive',view:'Bullish',legs:[{dir:'Short',type:'Put'},{dir:'Long',type:'Call'}],desc:'Sell put to finance buying call. Synthetic long exposure.',tip:"Creates stock-like exposure for little or no cost — but you're on the hook if it drops."},
+];
+
+// ===================== STATE =====================
+let ST={
+  screen:'risk',
+  riskAnswers:[null,null,null],
+  riskTier:null,
+  dashTab:'strategies',
+  selectedTicker:null,
+  selectedStrategy:null,
+  spotPrice:150,
+  builderTab:0,
+  legs:[],
+  searchQuery:'',
+  sectorFilter:'All',
+  ack:false,
+  prices:{},
+  priceSource:'loading',
+  priceFetchedCount:0,
+  intelData:null,
+  trades:[],
+  lastTradeId:null, // to highlight new trade in log
+};
+
+// ===================== PRICE FETCHING =====================
+const POLYGON_KEY='Ck88X1o5YZ9kbTR92DA_tQIeodiZKIWO';
+
+// Market hours check (US Eastern Time)
+function isMarketOpen(){
+  const now=new Date();
+  // Convert to US Eastern Time
+  const et=new Date(now.toLocaleString('en-US',{timeZone:'America/New_York'}));
+  const day=et.getDay(); // 0=Sun,6=Sat
+  if(day===0||day===6)return false;
+  const h=et.getHours(),m=et.getMinutes();
+  const mins=h*60+m;
+  return mins>=570&&mins<960; // 9:30am=570, 4:00pm=960
+}
+
+// Seeded random for consistent per-ticker drift direction
+function seededRand(seed){let s=seed%2147483647;if(s<=0)s+=2147483646;return(s*16807%2147483647)/2147483647}
+
+// Fallback price generator if Polygon fails (realistic price ranges)
+function fallbackPrice(t){
+  const KNOWN={AAPL:225,MSFT:390,NVDA:115,GOOGL:170,META:580,AMZN:195,TSLA:270,AVGO:185,AMD:105,INTC:22,CRM:295,ORCL:165,ADBE:385,QCOM:155,NOW:890,MU:98,AMAT:155,PLTR:85,NET:115,SNOW:155,UBER:72,ABNB:135,SHOP:95,ROKU:65,ZM:65,JPM:245,BAC:45,GS:565,MS:130,WFC:75,BLK:990,V:330,MA:530,AXP:290,C:72,SCHW:78,HOOD:42,SQ:68,PYPL:72,SOFI:14,COF:185,JNJ:155,UNH:490,LLY:780,PFE:26,MRK:98,ABBV:185,TMO:510,AMGN:265,GILD:98,ISRG:490,REGN:720,XOM:110,CVX:155,COP:115,SLB:42,OXY:48,WMT:95,COST:940,HD:380,MCD:295,SBUX:88,NKE:72,TGT:128,LOW:235,CAT:365,DE:395,BA:175,GE:185,RTX:125,LMT:465,UPS:118,FDX:245,F:10,GM:48,NFLX:975,DIS:95,CMCSA:38,T:22,SPOT:565,RIVN:12,LCID:3,COIN:195,MSTR:295,MARA:14,GME:28,AMC:3,SPY:560,QQQ:475,IWM:205,DIA:425,XLF:48,XLK:228,XLE:92,XLV:138,XLY:188,ARKK:48,GLD:238,SLV:28,USO:72,TLT:88,HYG:78,TQQQ:58,SQQQ:8,SOXL:22,SOXS:12,BABA:135,JD:38,PDD:145,BIDU:88,NIO:4};
+  return KNOWN[t]||50+Math.abs([...t].reduce((h,c)=>((h<<5)-h)+c.charCodeAt(0),0))%200;
+}
+
+// Initialize all tickers with fallback prices first
+function initPrices(){
+  ALL_TICKERS.forEach(t=>{
+    const base=fallbackPrice(t);
+    ST.prices[t]={price:base,close:base,change:0,pct:0,live:false};
+  });
+}
+
+// Fetch previous close from Polygon for a batch of tickers
+async function fetchPolygonBatch(tickers){
+  try{
+    const syms=tickers.join(',');
+    const r=await fetch(`https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers?tickers=${syms}&apiKey=${POLYGON_KEY}`,{signal:AbortSignal.timeout(10000)});
+    if(!r.ok)return false;
+    const d=await r.json();
+    if(d.tickers&&d.tickers.length>0){
+      d.tickers.forEach(t=>{
+        const sym=t.ticker;
+        const close=t.prevDay?.c||t.day?.c||t.lastTrade?.p||null;
+        if(close&&close>0){
+          const chg=t.todaysChange||0;
+          const pct=t.todaysChangePerc||0;
+          ST.prices[sym]={
+            price:close,      // current display price (will be sim'd intraday)
+            close:close,      // anchor — yesterday's real close
+            change:chg,
+            pct:pct,
+            live:true,
+          };
+          ST.priceFetchedCount++;
+        }
+      });
+      return true;
+    }
+  }catch(e){}
+  return false;
+}
+
+async function fetchAllPrices(){
+  ST.priceSource='loading';
+  render();
+  // Fetch in batches of 20 (free tier rate limit friendly)
+  const batches=[];
+  for(let i=0;i<ALL_TICKERS.length;i+=20)batches.push(ALL_TICKERS.slice(i,i+20));
+  for(const b of batches){
+    await fetchPolygonBatch(b);
+    await new Promise(r=>setTimeout(r,300)); // small delay to respect rate limits
+  }
+  ST.priceSource=ST.priceFetchedCount>30?'polygon':'simulated';
+  startIntradaySim();
+  render();
+}
+
+// ===================== INTRADAY SIMULATION =====================
+let _simTimer=null;
+
+function simPrice(t){return ST.prices[t]||{price:fallbackPrice(t),close:fallbackPrice(t),change:0,pct:0,live:false}}
+
+function tickPrices(){
+  if(!isMarketOpen()){
+    ALL_TICKERS.forEach(t=>{
+      if(ST.prices[t]){
+        ST.prices[t].price=ST.prices[t].close;
+        ST.prices[t].change=0;
+        ST.prices[t].pct=0;
+      }
+    });
+    ST.priceSource=ST.priceFetchedCount>30?'polygon-closed':'simulated-closed';
+    updateTickerDOM();
+    return;
+  }
+  ALL_TICKERS.forEach(t=>{
+    const p=ST.prices[t];if(!p)return;
+    const base=p.close;
+    const move=(Math.random()-0.5)*0.006;
+    let newPrice=p.price*(1+move);
+    const maxD=base*0.03;
+    newPrice=Math.max(base-maxD,Math.min(base+maxD,newPrice));
+    p.price=parseFloat(newPrice.toFixed(2));
+    p.change=parseFloat((p.price-base).toFixed(2));
+    p.pct=parseFloat(((p.price-base)/base*100).toFixed(2));
+  });
+  updateTickerDOM();
+}
+
+// Update only the ticker numbers in-place — no full re-render, no blink
+function updateTickerDOM(){
+  const C_green='#34d399',C_red='#f87171',C_text='#e8eaf0';
+  document.querySelectorAll('.ti').forEach(el=>{
+    const sym=el.querySelector('.sym')?.textContent;
+    if(!sym||!ST.prices[sym])return;
+    const p=ST.prices[sym];
+    const spans=el.querySelectorAll('span');
+    if(spans[1])spans[1].textContent='$'+p.price.toFixed(2);
+    if(spans[2]){
+      spans[2].textContent=(p.change>=0?'+':'')+p.pct.toFixed(2)+'%';
+      spans[2].style.color=p.change>=0?C_green:C_red;
+    }
+  });
+}
+
+function startIntradaySim(){
+  if(_simTimer)clearInterval(_simTimer);
+  _simTimer=setInterval(tickPrices,3000);
+}
+
+// ===================== INTELLIGENCE BRIEF — AUTO-FETCH =====================
+// ==================== INTELLIGENCE BRIEF (STATIC) ====================
+const INTEL_TIPS=[
+  {section:'Strategy Education',item:'Why implied volatility matters more than direction',interpretation:'High IV inflates premiums — selling options in high-IV environments gives you a statistical edge over time.',ticker:'SPY'},
+  {section:'Strategy Education',item:'Theta decay accelerates sharply near expiry',interpretation:'Options lose ~50% of remaining time value in the final 30% of their life. Short-dated options decay fastest.',ticker:'QQQ'},
+  {section:'Strategy Education',item:'Delta is your probability proxy for expiring ITM',interpretation:'A 0.30 delta option has roughly a 30% chance of finishing in-the-money at expiration.',ticker:'AAPL'},
+  {section:'Strategy Education',item:'Iron Condors profit from volatility contraction',interpretation:'Sell an iron condor after a volatility spike — collect rich premium and profit if IV reverts to mean.',ticker:'SPY'},
+  {section:'Strategy Education',item:'The Wheel strategy turns assignment into income',interpretation:'Sell cash-secured puts on stocks you want to own. If assigned, sell covered calls. Repeat for income.',ticker:'MSFT'},
+  {section:'Risk Management',item:'Never risk more than 2-5% of portfolio on a single trade',interpretation:'Position sizing is the biggest factor in long-term survival. Blown accounts are not recoverable.',ticker:'SPY'},
+  {section:'Risk Management',item:'Define your max loss BEFORE entering any trade',interpretation:'Spreads cap your loss automatically. Naked options do not — always know your worst-case before entry.',ticker:'QQQ'},
+  {section:'Risk Management',item:'Close winners early — take 50% profit and move on',interpretation:'Most professional traders close at 50% of max profit. Holding to expiry adds gamma risk with diminishing reward.',ticker:'SPY'},
+  {section:'Risk Management',item:'Avoid earnings with undefined-risk strategies',interpretation:'IV crush after earnings destroys long option value instantly. Use defined-risk spreads through events.',ticker:'NVDA'},
+  {section:'Market Concepts',item:'VIX above 20 signals elevated fear — good for sellers',interpretation:'When VIX spikes, option premiums inflate. Selling premium becomes more attractive in high-VIX environments.',ticker:'SPY'},
+  {section:'Market Concepts',item:'Put/Call ratio above 1.0 indicates bearish sentiment',interpretation:'A high put/call ratio can be a contrarian buy signal — excessive fear often precedes short-term bounces.',ticker:'QQQ'},
+  {section:'Market Concepts',item:'Earnings IV crush: buying options before earnings rarely works',interpretation:'Options price in expected moves before earnings. After the announcement, IV collapses and longs lose fast.',ticker:'AAPL'},
+  {section:'Beginner Tips',item:'Start with paper trading — always',interpretation:'OPTIX is a paper trading platform for a reason. Simulate at least 20 trades before committing real capital.',ticker:'SPY'},
+  {section:'Beginner Tips',item:'Covered Calls and Cash-Secured Puts are the safest entry points',interpretation:'Both have defined risk and are approved for most brokerage accounts. Master these before moving to spreads.',ticker:'MSFT'},
+  {section:'Beginner Tips',item:'Liquidity matters — stick to high-volume tickers',interpretation:'Wide bid-ask spreads eat your profit silently. SPY, QQQ, AAPL, MSFT have the tightest options spreads.',ticker:'SPY'},
+];
+
+function renderIntel(){
+  return`<div class="panel fade-in">
+    <h3>Options Intelligence Brief <span style="font-size:10px;color:${C.gold};font-weight:400;text-transform:none">· Curated Education & Market Concepts</span></h3>
+    <div style="overflow-x:auto">
+      <table class="it">
+        <thead><tr><th>Category</th><th>Topic</th><th>Key Insight</th><th>Ticker</th></tr></thead>
+        <tbody>
+          ${INTEL_TIPS.map(r=>`<tr>
+            <td class="isc">${r.section}</td>
+            <td style="color:${C.text};font-weight:500;max-width:200px">${r.item}</td>
+            <td style="color:${C.textMid};max-width:360px;line-height:1.6">${r.interpretation}</td>
+            <td><span class="ibadge">${r.ticker}</span></td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+    <div style="margin-top:14px;font-size:10px;color:${C.textDim}">✦ Curated options education — updated periodically by OPTIX.</div>
+  </div>`;
+}
+
+// ===================== BLACK-SCHOLES =====================
+function normCDF(x){const a1=0.254829592,a2=-0.284496736,a3=1.421413741,a4=-1.453152027,a5=1.061405429,p=0.3275911;const s=x<0?-1:1;x=Math.abs(x)/Math.sqrt(2);const t=1/(1+p*x);return 0.5*(1+s*(1-((((a5*t+a4)*t+a3)*t+a2)*t+a1)*t*Math.exp(-x*x)))}
+function normPDF(x){return Math.exp(-0.5*x*x)/Math.sqrt(2*Math.PI)}
+function bsPrice(S,K,T,r,sig,type){if(T<=0)return type==='Call'?Math.max(S-K,0):Math.max(K-S,0);const d1=(Math.log(S/K)+(r+0.5*sig*sig)*T)/(sig*Math.sqrt(T)),d2=d1-sig*Math.sqrt(T);return type==='Call'?S*normCDF(d1)-K*Math.exp(-r*T)*normCDF(d2):K*Math.exp(-r*T)*normCDF(-d2)-S*normCDF(-d1)}
+function bsGreeks(S,K,T,r,sig,type){if(T<=0)return{delta:type==='Call'?(S>K?1:0):(S<K?-1:0),gamma:0,theta:0,vega:0,rho:0};const d1=(Math.log(S/K)+(r+0.5*sig*sig)*T)/(sig*Math.sqrt(T)),d2=d1-sig*Math.sqrt(T),sqT=Math.sqrt(T);let delta,theta,rho;if(type==='Call'){delta=normCDF(d1);theta=(-S*normPDF(d1)*sig/(2*sqT)-r*K*Math.exp(-r*T)*normCDF(d2))/365;rho=K*T*Math.exp(-r*T)*normCDF(d2)/100}else{delta=normCDF(d1)-1;theta=(-S*normPDF(d1)*sig/(2*sqT)+r*K*Math.exp(-r*T)*normCDF(-d2))/365;rho=-K*T*Math.exp(-r*T)*normCDF(-d2)/100}return{delta,gamma:normPDF(d1)/(S*sig*sqT),theta,vega:S*normPDF(d1)*sqT/100,rho}}
+function legPremium(l,spot){if(l.type==='Stock')return 0;return bsPrice(spot,l.strike,l.dte/365,0.05,l.iv/100,l.type)*(l.dir==='Long'?-1:1)*l.qty*100}
+function legGreeks(l,spot){if(l.type==='Stock')return{delta:l.dir==='Long'?l.qty:-l.qty,gamma:0,theta:0,vega:0,rho:0};const g=bsGreeks(spot,l.strike,l.dte/365,0.05,l.iv/100,l.type);const m=l.dir==='Long'?1:-1;return{delta:g.delta*m*l.qty,gamma:g.gamma*m*l.qty,theta:g.theta*m*l.qty,vega:g.vega*m*l.qty,rho:g.rho*m*l.qty}}
+function payoffAtExpiry(legs,spot,px){let pnl=0;legs.forEach(l=>{const K=l.strike,q=l.qty,m=l.dir==='Long'?1:-1;if(l.type==='Stock')pnl+=(px-spot)*q*m;else{const intr=l.type==='Call'?Math.max(px-K,0):Math.max(K-px,0);pnl+=(intr-bsPrice(spot,K,l.dte/365,0.05,l.iv/100,l.type))*q*m*100}});return pnl}
+
+function defaultLegs(strat,spot){
+  return strat.legs.map((l,i)=>{
+    const base={qty:1,dte:30,iv:30};if(l.type==='Stock')return{...base,...l,strike:spot,iv:0,dte:0};
+    let strike=spot;const off=Math.round(spot*0.05),n=strat.name;
+    if(n==='Bull Call Spread')strike=i===0?spot:spot+off;
+    else if(n==='Bear Put Spread')strike=i===0?spot+off:spot;
+    else if(n==='Bull Put Spread')strike=i===0?spot:spot-off;
+    else if(n==='Bear Call Spread')strike=i===0?spot:spot+off;
+    else if(n==='Iron Condor'){strike=[spot-off,spot-2*off,spot+off,spot+2*off][i]||spot}
+    else if(n==='Iron Butterfly'){strike=[spot,spot-off,spot,spot+off][i]||spot}
+    else if(n==='Butterfly Spread'){strike=[spot-off,spot,spot,spot+off][i]||spot}
+    else if(n==='Long Strangle'||n==='Short Strangle')strike=l.type==='Call'?spot+off:spot-off;
+    else if(n==='Put Ratio Spread')strike=i===0?spot:spot-off;
+    else if(n==='Risk Reversal')strike=l.type==='Put'?spot-off:spot+off;
+    else if(n==='Collar'){if(l.type==='Put')strike=spot-off;if(l.type==='Call'&&l.dir==='Short')strike=spot+off}
+    else if(n==='Diagonal Spread')strike=i===1?spot+Math.round(spot*0.03):spot;
+    return{...base,...l,strike:Math.round(strike),iv:30};
+  });
+}
+
+function deriveRisk(a){const s=a[0]+a[1]+a[2];return s<=3?'Conservative':s<=6?'Moderate':'Aggressive'}
+
+// ===================== RENDER =====================
+function render(){
+  const app=document.getElementById('app'),nav=document.getElementById('nav'),badge=document.getElementById('riskBadge');
+  if(ST.screen==='risk'){nav.innerHTML='';badge.style.display='none'}
+  else{
+    const tc=ST.trades.length;
+    nav.innerHTML=`
+      <button class="${ST.screen==='dashboard'?'active':''}" onclick="goTo('dashboard')">Dashboard</button>
+      <button class="${ST.screen==='builder'?'active':''}" onclick="goTo('builder')" ${!ST.selectedStrategy?'disabled':''}>Builder</button>
+      <button class="${ST.screen==='tradelog'?'active':''} ${tc?'has-count':''}" ${tc?`data-count="${tc}"`:''} onclick="goTo('tradelog')">Trade Log</button>
+    `;
+    badge.style.display='';
+    const rc=ST.riskTier==='Conservative'?C.green:ST.riskTier==='Moderate'?C.orange:C.red;
+    badge.textContent=ST.riskTier;badge.style.color=rc;
+  }
+  if(ST.screen==='risk')renderRisk(app);
+  else if(ST.screen==='dashboard')renderDashboard(app);
+  else if(ST.screen==='builder')renderBuilder(app);
+  else if(ST.screen==='tradelog')renderTradeLog(app);
+}
+
+// ==================== RISK ====================
+function renderRisk(el){
+  const qs=[
+    {label:'Trading Experience',opts:['None / Paper only','1-2 years basic','3+ years active']},
+    {label:'Primary Objective',opts:['Capital preservation','Steady income','Aggressive growth']},
+    {label:'Loss Tolerance (per trade)',opts:['< 2% of portfolio','2-5% of portfolio','> 5% acceptable']},
+  ];
+  const done=ST.riskAnswers.every(a=>a!==null);
+  const tier=done?deriveRisk(ST.riskAnswers):null;
+  el.innerHTML=`<div class="risk-screen fade-in">
+    <h1>OPTIX</h1>
+    <div class="tagline">Strategy-First Options Intelligence</div>
+    <div class="sub">Answer three questions to calibrate your risk profile and unlock the platform.</div>
+    ${qs.map((q,qi)=>`<div class="risk-card fade-d${qi+1}"><label>${q.label}</label><div class="opts">${q.opts.map((o,oi)=>`<div class="opt ${ST.riskAnswers[qi]===oi?'sel':''}" onclick="ST.riskAnswers[${qi}]=${oi};render()">${o}</div>`).join('')}</div></div>`).join('')}
+    ${tier?`<div style="text-align:center;margin-bottom:12px;font-size:12px;color:${tier==='Conservative'?C.green:tier==='Moderate'?C.orange:C.red}">Profile: <strong>${tier}</strong></div>`:''}
+    <button class="risk-submit ${done?'rdy':''}" onclick="enterDashboard()">Enter Dashboard →</button>
+  </div>`;
+}
+
+function enterDashboard(){
+  ST.riskTier=deriveRisk(ST.riskAnswers);
+  ST.screen='dashboard';
+  initPrices();
+  render();
+  fetchAllPrices();
+}
+
+function changeRisk(){
+  ST.screen='risk';
+  ST.riskAnswers=[null,null,null];
+  ST.riskTier=null;
+  if(_simTimer)clearInterval(_simTimer);
+  render();
+}
+
+function setRiskManual(tier){ST.riskTier=tier;render()}
+
+// ==================== DASHBOARD ====================
+function renderDashboard(el){
+  const rc=ST.riskTier==='Conservative'?C.green:ST.riskTier==='Moderate'?C.orange:C.red;
+  const marketOpen=isMarketOpen();
+  const riskBanner=`
+    <div style="display:flex;align-items:center;justify-content:space-between;background:${ST.riskTier==='Conservative'?'rgba(52,211,153,0.06)':ST.riskTier==='Moderate'?'rgba(251,146,60,0.06)':'rgba(248,113,113,0.06)'};border:1px solid ${ST.riskTier==='Conservative'?'rgba(52,211,153,0.2)':ST.riskTier==='Moderate'?'rgba(251,146,60,0.2)':'rgba(248,113,113,0.2)'};border-radius:6px;padding:10px 16px;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:10px;color:${C.textDim};text-transform:uppercase;letter-spacing:.5px">Risk Profile</span>
+        <span style="font-size:13px;font-weight:700;color:${rc}">${ST.riskTier}</span>
+        <span style="font-size:10px;color:${C.textDim}">·</span>
+        <span style="font-size:10px;color:${C.textDim}">${ST.riskTier==='Conservative'?'Strategies marked ✦ REC are best suited for you':ST.riskTier==='Moderate'?'Moderate & conservative strategies recommended':'All strategies unlocked — manage position size carefully'}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="font-size:10px;color:${C.textDim}">Switch:</span>
+        ${['Conservative','Moderate','Aggressive'].filter(t=>t!==ST.riskTier).map(t=>`<button onclick="setRiskManual('${t}')" style="padding:4px 10px;border-radius:4px;font-size:10px;font-weight:600;background:${C.surfaceUp};border:1px solid ${C.border};color:${C.textMid};cursor:pointer" onmouseover="this.style.borderColor='${C.gold}';this.style.color='${C.gold}'" onmouseout="this.style.borderColor='${C.border}';this.style.color='${C.textMid}'">${t}</button>`).join('')}
+        <button onclick="changeRisk()" style="padding:4px 10px;border-radius:4px;font-size:10px;font-weight:600;background:${C.goldDim};border:1px solid ${C.borderGold};color:${C.gold};cursor:pointer">↺ Retake Quiz</button>
+      </div>
+    </div>`;
+
+  const srcLabel=
+    ST.priceSource==='loading'?`<span class="spinner" style="width:12px;height:12px;border-width:1.5px"></span>Fetching prices...`:
+    ST.priceSource==='polygon'?`● Polygon · Real close${marketOpen?' + live sim':' (market closed)'}`:
+    ST.priceSource==='polygon-closed'?`◉ Polygon · Market closed`:
+    `○ Simulated prices`;
+  const srcClass=ST.priceSource==='polygon'||ST.priceSource==='polygon-closed'?'live':ST.priceSource==='loading'?'del':'sim';
+
+  el.innerHTML=`
+    ${renderTicker()}
+    ${riskBanner}
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div class="dash-tabs">
+        <button class="${ST.dashTab==='strategies'?'active':''}" onclick="ST.dashTab='strategies';render()">Strategy Library</button>
+        <button class="${ST.dashTab==='intel'?'active':''}" onclick="ST.dashTab='intel';render()">Intelligence Brief</button>
+      </div>
+      <div class="ps ${srcClass}">${srcLabel}</div>
+    </div>
+    ${ST.dashTab==='strategies'?renderStratLib():renderIntel()}`;
+}
+
+function renderTicker(){
+  const items=ALL_TICKERS.map(t=>{const p=simPrice(t);return`<div class="ti" onclick="selectTicker('${t}')"><span class="sym">${t}</span><span style="color:${C.text}">$${p.price.toFixed(2)}</span><span class="${p.change>=0?'up':'dn'}">${p.change>=0?'+':''}${p.pct.toFixed(2)}%</span></div>`}).join('');
+  return`<div class="ticker-wrap"><div class="ticker-tape">${items}${items}</div></div>`;
+}
+
+function renderStratLib(){
+  const q=ST.searchQuery.toLowerCase();
+  const filtered=STRATEGIES.filter(s=>!q||s.name.toLowerCase().includes(q)||s.desc.toLowerCase().includes(q));
+  const secTickers=ST.sectorFilter==='All'?ALL_TICKERS:INSTRUMENTS[ST.sectorFilter]||ALL_TICKERS;
+  return`
+    <div style="margin-bottom:20px">
+      <div style="font-size:11px;color:${C.gold};font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:10px">Select Underlying</div>
+      <div class="filter-bar">
+        <input type="text" placeholder="Search tickers or strategies..." value="${ST.searchQuery}" oninput="ST.searchQuery=this.value;render()"/>
+        <select onchange="ST.sectorFilter=this.value;render()">
+          <option value="All">All Sectors</option>
+          ${Object.keys(INSTRUMENTS).map(s=>`<option value="${s}" ${ST.sectorFilter===s?'selected':''}>${s}</option>`).join('')}
+        </select>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;max-height:130px;overflow-y:auto;padding:4px 0">
+        ${secTickers.filter(t=>!q||t.toLowerCase().includes(q)).map(t=>{
+          const p=simPrice(t);const sel=ST.selectedTicker===t;
+          return`<div onclick="selectTicker('${t}')" style="padding:5px 10px;border-radius:4px;font-size:11px;cursor:pointer;transition:all .2s;background:${sel?C.goldDimB:C.surfaceUp};border:1px solid ${sel?C.gold:C.border};color:${sel?C.gold:C.textMid};display:inline-flex;align-items:center;gap:6px">
+            <span style="font-weight:600;color:${sel?C.gold:C.text}">${t}</span>
+            <span>$${p.price.toFixed(0)}</span>
+            <span style="color:${p.change>=0?C.green:C.red};font-size:10px">${p.change>=0?'▲':'▼'}${Math.abs(p.pct).toFixed(1)}%</span>
+            ${p.live?'<span style="color:'+C.green+';font-size:8px">●</span>':''}
+          </div>`}).join('')}
+      </div>
+    </div>
+    <div style="font-size:11px;color:${C.gold};font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:12px">Strategies ${ST.selectedTicker?'for <span style="color:'+C.text+'">'+ST.selectedTicker+'</span>':''}</div>
+    <div class="strat-grid">${filtered.map(s=>{
+      const isRec=ST.riskTier===s.risk||(ST.riskTier==='Aggressive')||(ST.riskTier==='Moderate'&&s.risk!=='Aggressive');
+      const rc=s.risk==='Conservative'?'rc':s.risk==='Moderate'?'rm':'ra';
+      return`<div class="sc" onclick="selectStrategy('${s.name}')">
+        <div class="nm">${s.name}${isRec?'<span class="rec">✦ REC</span>':''}</div>
+        <div class="tags"><span class="tag ${rc}">${s.risk}</span><span class="tag vw">${s.view}</span></div>
+        <div class="desc">${s.desc}</div>
+        <div class="ii" onclick="event.stopPropagation()">ⓘ</div><div class="tip">${s.tip}</div>
+      </div>`}).join('')}</div>`;
+}
+
+function selectTicker(t){ST.selectedTicker=t;ST.spotPrice=simPrice(t).price;render()}
+function selectStrategy(name){
+  if(!ST.selectedTicker){alert('Select an underlying ticker first');return}
+  const st=STRATEGIES.find(s=>s.name===name);
+  ST.selectedStrategy=st;ST.legs=defaultLegs(st,ST.spotPrice);ST.builderTab=0;ST.ack=false;ST.screen='builder';render();
+}
+
+// ==================== INTELLIGENCE BRIEF ====================
+
+// ==================== BUILDER ====================
+function renderBuilder(el){
+  const st=ST.selectedStrategy;if(!st){el.innerHTML='<p style="color:'+C.textMid+'">No strategy selected. Go to Dashboard to pick one.</p>';return}
+  const tabs=['Legs','Payoff','Greeks','Scenarios','Review'];
+  el.innerHTML=`
+    <div class="bh fade-in"><div><h2>${st.name}</h2></div>
+      <div class="meta">Underlying<span class="tb">${ST.selectedTicker}</span> · Spot $${ST.spotPrice.toFixed(2)}${simPrice(ST.selectedTicker).live?' <span style="color:'+C.green+';font-size:9px">● live</span>':''}</div>
+    </div>
+    <div class="bt fade-d1">${tabs.map((t,i)=>`<button class="${ST.builderTab===i?'active':''}" onclick="ST.builderTab=${i};render()"><span class="num">${i+1}</span>${t}</button>`).join('')}</div>
+    <div class="fade-d2">${[renderLegs,renderPayoff,renderGreeks,renderScenarios,renderReview][ST.builderTab]()}</div>`;
+}
+
+function renderLegs(){
+  const spot=ST.spotPrice;let total=0;ST.legs.forEach(l=>total+=legPremium(l,spot));
+  return`<div class="panel"><h3>Option Legs</h3><div style="overflow-x:auto"><table class="lt">
+    <thead><tr><th>#</th><th>Dir</th><th>Type</th><th>Strike</th><th>DTE</th><th>IV%</th><th>Qty</th><th>Premium</th><th>Δ</th><th>Γ</th><th>Θ</th><th>V</th><th></th></tr></thead>
+    <tbody>${ST.legs.map((l,i)=>{const p=legPremium(l,spot),g=legGreeks(l,spot);
+      return`<tr>
+        <td style="color:${C.gold};font-weight:600">${i+1}</td>
+        <td><select onchange="ST.legs[${i}].dir=this.value;render()"><option ${l.dir==='Long'?'selected':''}>Long</option><option ${l.dir==='Short'?'selected':''}>Short</option></select></td>
+        <td><select onchange="ST.legs[${i}].type=this.value;render()"><option ${l.type==='Call'?'selected':''}>Call</option><option ${l.type==='Put'?'selected':''}>Put</option><option ${l.type==='Stock'?'selected':''}>Stock</option></select></td>
+        <td><input type="number" value="${l.strike}" onchange="ST.legs[${i}].strike=+this.value;render()" style="width:70px"/></td>
+        <td><input type="number" value="${l.dte}" onchange="ST.legs[${i}].dte=+this.value;render()" style="width:50px"/></td>
+        <td><input type="number" value="${l.iv}" onchange="ST.legs[${i}].iv=+this.value;render()" style="width:50px"/></td>
+        <td><input type="number" value="${l.qty}" min="1" onchange="ST.legs[${i}].qty=+this.value;render()" style="width:45px"/></td>
+        <td class="prem">${p>=0?'+':''}$${p.toFixed(0)}</td>
+        <td class="grk">${g.delta.toFixed(3)}</td><td class="grk">${g.gamma.toFixed(4)}</td>
+        <td class="grk">${g.theta.toFixed(2)}</td><td class="grk">${g.vega.toFixed(2)}</td>
+        <td>${ST.legs.length>1?`<button class="rm-leg" onclick="ST.legs.splice(${i},1);render()">✕</button>`:''}</td>
+      </tr>`}).join('')}</tbody></table></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:16px">
+      <button class="add-leg" onclick="ST.legs.push({dir:'Long',type:'Call',strike:ST.spotPrice,qty:1,dte:30,iv:30});render()">+ Add Leg</button>
+      <div style="font-size:12px">Net Premium: <span style="color:${total>=0?C.green:C.red};font-weight:600">${total>=0?'+':''}$${total.toFixed(0)}</span></div>
+    </div></div>`;
+}
+
+function renderPayoff(){
+  const spot=ST.spotPrice,lo=spot*0.7,hi=spot*1.3,steps=200,dx=(hi-lo)/steps;
+  let pts=[],mn=Infinity,mx=-Infinity;
+  for(let i=0;i<=steps;i++){const px=lo+i*dx,pnl=payoffAtExpiry(ST.legs,spot,px);pts.push({x:px,y:pnl});if(pnl<mn)mn=pnl;if(pnl>mx)mx=pnl}
+  const pad=(mx-mn)*0.15||50,yMin=mn-pad,yMax=mx+pad;
+  const W=800,H=320,ml=60,mr=20,mt=20,mb=40,cw=W-ml-mr,ch=H-mt-mb;
+  const sx=x=>ml+((x-lo)/(hi-lo))*cw,sy=y=>mt+ch-((y-yMin)/(yMax-yMin))*ch;
+  let bes=[];for(let i=1;i<pts.length;i++){if((pts[i-1].y<=0&&pts[i].y>=0)||(pts[i-1].y>=0&&pts[i].y<=0)){const f=-pts[i-1].y/(pts[i].y-pts[i-1].y);bes.push(pts[i-1].x+f*dx)}}
+  let path='';pts.forEach((p,i)=>path+=(i?'L':'M')+sx(p.x).toFixed(1)+','+sy(p.y).toFixed(1));
+  return`<div class="panel"><h3>Payoff at Expiry</h3>
+    <svg viewBox="0 0 ${W} ${H}" class="payoff-svg">
+      ${[.25,.5,.75].map(f=>`<line x1="${ml}" y1="${mt+ch*f}" x2="${W-mr}" y2="${mt+ch*f}" stroke="${C.border}" stroke-dasharray="3,3"/>`).join('')}
+      <line x1="${ml}" y1="${sy(0)}" x2="${W-mr}" y2="${sy(0)}" stroke="${C.textDim}"/>
+      <clipPath id="pc"><rect x="${ml}" y="${mt}" width="${cw}" height="${Math.max(sy(0)-mt,0)}"/></clipPath>
+      <clipPath id="lc"><rect x="${ml}" y="${sy(0)}" width="${cw}" height="${Math.max(mt+ch-sy(0),0)}"/></clipPath>
+      <path d="${path} L${sx(hi).toFixed(1)},${sy(0).toFixed(1)} L${sx(lo).toFixed(1)},${sy(0).toFixed(1)} Z" fill="rgba(52,211,153,0.1)" clip-path="url(#pc)"/>
+      <path d="${path} L${sx(hi).toFixed(1)},${sy(0).toFixed(1)} L${sx(lo).toFixed(1)},${sy(0).toFixed(1)} Z" fill="rgba(248,113,113,0.08)" clip-path="url(#lc)"/>
+      <path d="${path}" fill="none" stroke="${C.gold}" stroke-width="2"/>
+      <line x1="${sx(spot)}" y1="${mt}" x2="${sx(spot)}" y2="${mt+ch}" stroke="${C.blue}" stroke-dasharray="4,4"/>
+      <text x="${sx(spot)}" y="${mt-4}" text-anchor="middle" fill="${C.blue}" font-size="10" font-family="var(--mono)">Spot $${spot.toFixed(0)}</text>
+      ${bes.map(b=>`<circle cx="${sx(b)}" cy="${sy(0)}" r="4" fill="${C.orange}"/><text x="${sx(b)}" y="${sy(0)+16}" text-anchor="middle" fill="${C.orange}" font-size="9" font-family="var(--mono)">BE $${b.toFixed(0)}</text>`).join('')}
+      <text x="${ml-8}" y="${sy(mx)+4}" text-anchor="end" fill="${C.textDim}" font-size="9" font-family="var(--mono)">+$${mx.toFixed(0)}</text>
+      <text x="${ml-8}" y="${sy(mn)+4}" text-anchor="end" fill="${C.textDim}" font-size="9" font-family="var(--mono)">${mn>=0?'+':''}$${mn.toFixed(0)}</text>
+      <text x="${ml-8}" y="${sy(0)+4}" text-anchor="end" fill="${C.textDim}" font-size="9" font-family="var(--mono)">$0</text>
+      ${[0,.25,.5,.75,1].map(f=>{const v=lo+f*(hi-lo);return`<text x="${sx(v)}" y="${H-8}" text-anchor="middle" fill="${C.textDim}" font-size="9" font-family="var(--mono)">$${v.toFixed(0)}</text>`}).join('')}
+    </svg>
+    <div style="display:flex;gap:20px;margin-top:12px;font-size:11px;color:${C.textMid}">
+      <span>Max Profit: <span style="color:${C.green};font-weight:600">+$${mx.toFixed(0)}</span></span>
+      <span>Max Loss: <span style="color:${C.red};font-weight:600">$${mn.toFixed(0)}</span></span>
+      ${bes.length?`<span>Break-even${bes.length>1?'s':''}: ${bes.map(b=>'$'+b.toFixed(1)).join(', ')}</span>`:''}
+    </div></div>`;
+}
+
+function renderGreeks(){
+  const spot=ST.spotPrice;let agg={delta:0,gamma:0,theta:0,vega:0,rho:0};
+  ST.legs.forEach(l=>{const g=legGreeks(l,spot);Object.keys(agg).forEach(k=>agg[k]+=g[k])});
+  const gd=[
+    {s:'Δ',n:'Delta',v:agg.delta,h:'P&L per $1 move in underlying',c:C.blue},
+    {s:'Γ',n:'Gamma',v:agg.gamma,h:'Rate of delta change per $1 move',c:C.green},
+    {s:'Θ',n:'Theta',v:agg.theta,h:'Daily time decay ($/day)',c:C.red},
+    {s:'V',n:'Vega',v:agg.vega,h:'P&L per 1% change in IV',c:C.orange},
+    {s:'ρ',n:'Rho',v:agg.rho,h:'P&L per 1% change in rates',c:C.textMid},
+  ];
+  const mx=Math.max(...gd.map(g=>Math.abs(g.v)),0.01);
+  return`<div class="panel"><h3>Aggregate Greeks</h3>
+    <div class="gg">${gd.map(g=>{const pct=Math.min(Math.abs(g.v)/mx*100,100);
+      return`<div class="gb"><div class="gl">${g.s} ${g.n}</div>
+        <div class="bw"><div class="bf" style="height:${pct}%;background:${g.c};opacity:.3"></div>
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:${g.c}">${g.v>=0?'+':''}${g.v.toFixed(g.n==='Gamma'?4:3)}</div></div>
+        <div class="gv" style="color:${g.c}">${g.v>=0?'+':''}${g.v.toFixed(3)}</div>
+        <div class="gh">${g.h}</div></div>`}).join('')}</div>
+    <div style="margin-top:20px;padding:14px;background:${C.surfaceUp};border-radius:5px;border:1px solid ${C.border};font-size:11px;color:${C.textMid};line-height:1.7">
+      <strong style="color:${C.gold}">Position Summary:</strong><br/>
+      ${agg.delta>0?'Net long delta — profits from upside.':agg.delta<0?'Net short delta — profits from downside.':'Delta-neutral — directionally hedged.'}
+      ${agg.theta>0?' Positive theta — earns from time decay.':agg.theta<0?' Negative theta — loses value daily.':''}
+      ${agg.vega>0?' Long vega — benefits from vol expansion.':agg.vega<0?' Short vega — benefits from vol contraction.':''}
+    </div></div>`;
+}
+
+function renderScenarios(){
+  const spot=ST.spotPrice,pms=[-20,-15,-10,-5,0,5,10,15,20],vs=[-10,0,10];
+  return`<div class="panel"><h3>Scenario Analysis</h3>
+    <p style="font-size:11px;color:${C.textMid};margin-bottom:16px">P&L under price moves × implied volatility shocks</p>
+    <div style="overflow-x:auto"><table class="st"><thead><tr><th></th>${vs.map(v=>`<th>IV ${v>=0?'+':''}${v}%</th>`).join('')}</tr></thead>
+    <tbody>${pms.map(pm=>{const ns=spot*(1+pm/100);
+      return`<tr><td class="hc">${pm>=0?'+':''}${pm}% ($${ns.toFixed(0)})</td>
+        ${vs.map(vsh=>{let pnl=0;ST.legs.forEach(l=>{if(l.type==='Stock')pnl+=(ns-spot)*l.qty*(l.dir==='Long'?1:-1);else{const niv=Math.max(l.iv+vsh,5);pnl+=(bsPrice(ns,l.strike,l.dte/365,0.05,niv/100,l.type)-bsPrice(spot,l.strike,l.dte/365,0.05,l.iv/100,l.type))*l.qty*(l.dir==='Long'?1:-1)*100}});
+          return`<td class="${pnl>10?'profit':pnl<-10?'loss':'neutral'}">${pnl>=0?'+':''}$${pnl.toFixed(0)}</td>`}).join('')}
+      </tr>`}).join('')}</tbody></table></div></div>`;
+}
+
+function renderReview(){
+  const st=ST.selectedStrategy,spot=ST.spotPrice;let total=0;ST.legs.forEach(l=>total+=legPremium(l,spot));
+  const unlim=st.name.includes('Short Straddle')||st.name.includes('Short Strangle')||st.name==='Risk Reversal';
+  const assign=ST.legs.some(l=>l.dir==='Short'&&l.type!=='Stock');
+  const decay=ST.legs.some(l=>l.dir==='Long'&&l.type!=='Stock');
+  return`<div class="panel"><h3>Review & Confirm</h3>
+    <div class="rsec"><h4>Order Summary</h4>
+      <div class="rrow"><span class="rl">Strategy</span><span class="rv">${st.name}</span></div>
+      <div class="rrow"><span class="rl">Underlying</span><span class="rv">${ST.selectedTicker} @ $${spot.toFixed(2)}</span></div>
+      <div class="rrow"><span class="rl">Legs</span><span class="rv">${ST.legs.length}</span></div>
+      ${ST.legs.map((l,i)=>`<div class="rrow"><span class="rl" style="padding-left:12px">Leg ${i+1}</span><span class="rv">${l.dir} ${l.qty}× ${l.type}${l.type!=='Stock'?' $'+l.strike+' '+l.dte+'DTE':''}</span></div>`).join('')}
+      <div class="rrow"><span class="rl">Net Premium</span><span class="rv" style="color:${total>=0?C.green:C.red}">${total>=0?'+':''}$${total.toFixed(2)}</span></div>
+      <div class="rrow"><span class="rl">Risk Tier</span><span class="rv">${st.risk}</span></div>
+      <div class="rrow"><span class="rl">Market View</span><span class="rv">${st.view}</span></div>
+    </div>
+    ${unlim?'<div class="rwarn"><div class="wt">⚠ Unlimited Loss Risk</div>This strategy has theoretically unlimited loss potential. Short naked options can result in losses far exceeding the premium received.</div>':''}
+    ${assign?'<div class="rwarn"><div class="wt">⚠ Assignment Risk</div>Short options may be assigned at any time (American-style). Early assignment is more likely near ex-dividend dates or when deep ITM.</div>':''}
+    ${decay?'<div class="rwarn"><div class="wt">⚠ Theta Decay</div>Long options lose value daily. If the underlying doesn\'t move enough before expiration, the position will erode from time decay.</div>':''}
+    <div class="ack-row"><input type="checkbox" id="ackBox" ${ST.ack?'checked':''} onchange="ST.ack=this.checked;render()"/><label for="ackBox">I acknowledge the risks above and understand this is a paper trade for educational purposes only.</label></div>
+    <button class="cbtn ${ST.ack?'rdy':''}" onclick="confirmTrade()">Confirm Paper Trade</button>
+  </div>`;
+}
+
+// ==================== TRADE LOG ====================
+function confirmTrade(){
+  if(!ST.ack)return;
+  const st=ST.selectedStrategy,spot=ST.spotPrice;let total=0;ST.legs.forEach(l=>total+=legPremium(l,spot));
+  const id=Date.now();
+  ST.trades.push({
+    id,strategy:st.name,ticker:ST.selectedTicker,spot,
+    legs:JSON.parse(JSON.stringify(ST.legs)),
+    netPremium:total,risk:st.risk,view:st.view,
+    time:new Date().toISOString(),
+  });
+  ST.lastTradeId=id;
+  document.getElementById('modalMsg').textContent=`${st.name} on ${ST.selectedTicker} — ${ST.legs.length} leg${ST.legs.length>1?'s':''} recorded.`;
+  document.getElementById('modal').style.display='flex';
+}
+
+function closeModal(){
+  document.getElementById('modal').style.display='none';
+  // Navigate to trade log so user sees their trade
+  ST.screen='tradelog';
+  ST.selectedStrategy=null;ST.legs=[];ST.ack=false;
+  render();
+  // Scroll to top
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function renderTradeLog(el){
+  el.innerHTML=`
+    <div class="bh fade-in">
+      <h2 style="font-family:var(--display);font-size:22px;font-weight:700;background:var(--goldGrad);-webkit-background-clip:text;-webkit-text-fill-color:transparent">Paper Trade Log</h2>
+      <div style="font-size:11px;color:${C.textMid}">${ST.trades.length} trade${ST.trades.length!==1?'s':''} recorded</div>
+    </div>
+    ${ST.trades.length===0?`
+      <div class="tl-empty fade-d1">
+        <div style="font-size:28px;margin-bottom:12px;opacity:.3">◇</div>
+        <div>No paper trades yet.</div>
+        <div style="margin-top:6px;font-size:11px;color:${C.textDim}">Select a strategy from the dashboard and confirm a trade to see it here.</div>
+        <button onclick="goTo('dashboard')" style="margin-top:16px;padding:8px 20px;background:${C.goldDimB};border:1px solid ${C.borderGold};border-radius:4px;color:${C.gold};font-size:11px;font-weight:600">Go to Dashboard</button>
+      </div>
+    `:`
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px" class="fade-d1">${renderTradeStats()}</div>
+      <div class="fade-d2">${[...ST.trades].reverse().map((t,i)=>{
+        const dt=new Date(t.time);
+        const ts=dt.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' '+dt.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+        const isNew=t.id===ST.lastTradeId;
+        return`<div class="tl-card ${isNew?'new':''}" style="animation:fadeIn .3s ease ${i*0.05}s both">
+          <div style="display:flex;flex-direction:column;gap:3px">
+            <div style="font-size:13px;font-weight:600;color:${C.text}">${t.strategy} ${isNew?'<span style="font-size:9px;color:'+C.green+';font-weight:700;margin-left:6px">✓ NEW</span>':''}</div>
+            <div style="font-size:10px;color:${C.textMid}">
+              <span style="color:${C.gold}">${t.ticker}</span> @ $${t.spot.toFixed(2)} · ${t.legs.length} leg${t.legs.length>1?'s':''}
+              <span class="tag ${t.risk==='Conservative'?'rc':t.risk==='Moderate'?'rm':'ra'}" style="font-size:9px;padding:1px 5px;margin-left:4px">${t.risk}</span>
+              <span class="tag vw" style="font-size:9px;padding:1px 5px">${t.view}</span>
+            </div>
+            <div style="font-size:10px;color:${C.textDim};margin-top:1px">
+              ${t.legs.map(l=>`${l.dir} ${l.qty}× ${l.type}${l.type!=='Stock'?' $'+l.strike:''}`).join(' · ')}
+            </div>
+          </div>
+          <div style="text-align:right;display:flex;flex-direction:column;gap:3px;min-width:80px">
+            <div style="font-size:13px;font-weight:600;color:${t.netPremium>=0?C.green:C.red}">${t.netPremium>=0?'+':''}$${t.netPremium.toFixed(0)}</div>
+            <div style="font-size:10px;color:${C.textDim}">${ts}</div>
+            <button onclick="ST.trades=ST.trades.filter(x=>x.id!==${t.id});if(ST.lastTradeId===${t.id})ST.lastTradeId=null;render()" style="background:none;border:none;color:${C.textDim};font-size:10px;cursor:pointer;text-align:right;padding:0">Remove</button>
+          </div>
+        </div>`}).join('')}</div>
+    `}`;
+}
+
+function renderTradeStats(){
+  const tp=ST.trades.reduce((a,t)=>a+t.netPremium,0);
+  const cr=ST.trades.filter(t=>t.netPremium>0).length;
+  const dr=ST.trades.filter(t=>t.netPremium<0).length;
+  const tk=[...new Set(ST.trades.map(t=>t.ticker))];
+  const ss=[...new Set(ST.trades.map(t=>t.strategy))];
+  return`
+    <div style="background:${C.surface};border:1px solid ${C.border};border-radius:6px;padding:14px 16px">
+      <div style="font-size:10px;color:${C.textDim};text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Net Premium</div>
+      <div style="font-size:18px;font-weight:700;color:${tp>=0?C.green:C.red}">${tp>=0?'+':''}$${tp.toFixed(0)}</div>
+    </div>
+    <div style="background:${C.surface};border:1px solid ${C.border};border-radius:6px;padding:14px 16px">
+      <div style="font-size:10px;color:${C.textDim};text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Trades</div>
+      <div style="font-size:18px;font-weight:700;color:${C.text}">${ST.trades.length}</div>
+      <div style="font-size:10px;color:${C.textMid};margin-top:2px">${cr} credit · ${dr} debit</div>
+    </div>
+    <div style="background:${C.surface};border:1px solid ${C.border};border-radius:6px;padding:14px 16px">
+      <div style="font-size:10px;color:${C.textDim};text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Tickers</div>
+      <div style="font-size:18px;font-weight:700;color:${C.gold}">${tk.length}</div>
+      <div style="font-size:10px;color:${C.textMid};margin-top:2px">${tk.slice(0,4).join(', ')}${tk.length>4?'…':''}</div>
+    </div>
+    <div style="background:${C.surface};border:1px solid ${C.border};border-radius:6px;padding:14px 16px">
+      <div style="font-size:10px;color:${C.textDim};text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Strategies</div>
+      <div style="font-size:18px;font-weight:700;color:${C.gold}">${ss.length}</div>
+      <div style="font-size:10px;color:${C.textMid};margin-top:2px">${ss.slice(0,3).join(', ')}${ss.length>3?'…':''}</div>
+    </div>`;
+}
+
+function goTo(s){ST.screen=s;render()}
+
+// Init
+render();
+</script>
+</body>
+</html>
