@@ -1,1 +1,0 @@
-# Optix__byParth
